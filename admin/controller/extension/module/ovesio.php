@@ -701,6 +701,17 @@ class ControllerExtensionModuleOvesio extends Controller
         $filters['date_from']     = isset($this->request->get['date_from']) ? $this->request->get['date_from'] : '';
         $filters['date_to']       = isset($this->request->get['date_to']) ? $this->request->get['date_to'] : '';
 
+        $project = explode(':', $this->config->get($this->module_key . '_api_token'));
+        $project = $project[0];
+
+        if (defined('OVESIO_APP_URL')) {
+            $base_url = rtrim(OVESIO_APP_URL, '/');
+        } else {
+            $base_url = 'https://app.ovesio.com';
+        }
+
+        $base_url .= "/account/$project"; // 'app/translate_requests
+
         $activities = $this->model_extension_module_ovesio->getActivities($filters);
         $activities_total = $this->model_extension_module_ovesio->getActivitiesTotal($filters);
 
@@ -719,9 +730,9 @@ class ControllerExtensionModuleOvesio extends Controller
 
         // Map activity types to display text and badge classes
         $activity_types = [
-            'generate_content' => ['text' => $this->language->get('activity_generate_content'), 'class' => 'ov-badge-info'],
-            'generate_seo'     => ['text' => $this->language->get('activity_generate_seo'), 'class' => 'ov-badge-warning'],
-            'translate'        => ['text' => $this->language->get('activity_translate'), 'class' => 'ov-badge-success']
+            'generate_content' => ['text' => $this->language->get('activity_generate_content'), 'class' => 'ov-badge-info', 'url_pattern' => $base_url . '/ai/generate_descriptions/%s'],
+            'generate_seo'     => ['text' => $this->language->get('activity_generate_seo'), 'class' => 'ov-badge-warning', 'url_pattern' => $base_url . '/ai/generate_seo/%s'],
+            'translate'        => ['text' => $this->language->get('activity_translate'), 'class' => 'ov-badge-success', 'url_pattern' => $base_url . '/app/translate_requests/%s']
         ];
 
         // Map status to display text and badge classes
@@ -799,6 +810,12 @@ class ControllerExtensionModuleOvesio extends Controller
             $activity['language_name']         = isset($languages_info[$activity['lang']]) ? $languages_info[$activity['lang']]['name'] : $activity['lang'];
             $activity['language_flag']         = isset($languages_info[$activity['lang']]) ? 'language/' . $languages_info[$activity['lang']]['code'] . '/' . $languages_info[$activity['lang']]['code'] . '.png' : '';
             $activity['resource_name_escaped'] = htmlspecialchars($activity['resource_name'], ENT_QUOTES, 'UTF-8');
+
+            if ($activity['activity_id']) {
+                $activity['activity_url'] = sprintf($activity_info['url_pattern'], $activity['activity_id']);
+            } else {
+                $activity['activity_url'] = '';
+            }
 
             // resource url
             if ($activity['resource_type'] == 'product') {

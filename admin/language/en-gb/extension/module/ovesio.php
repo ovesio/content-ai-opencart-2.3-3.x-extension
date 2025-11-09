@@ -144,6 +144,7 @@ $_['error_invalid_number'] = 'Error: A valid number greater than 0 must be enter
 // Status tooltips
 $_['text_tooltip_view_request'] = 'View Request';
 $_['text_tooltip_view_response'] = 'View Response';
+$_['text_tooltip_view_in_app'] = 'View in App';
 $_['text_tooltip_update_status'] = 'Update Status';
 
 // Common texts
