@@ -372,6 +372,8 @@ class QueueHandler
                 }
             }
 
+            $push['content'] = $this->decode($push['content']);
+
             // remove description from hash to avoid recreating it everytime
             $_push = $push;
             if (!empty($_push['content']['description'])) {
@@ -432,6 +434,8 @@ class QueueHandler
             if (strtolower(preg_replace("/[^A-Za-z0-9 ]/", '', $_description)) != strtolower(preg_replace("/[^A-Za-z0-9 ]/", '', strip_tags($this->decode($category['name']))))) {
                 $push['content']['description'] = $category['description'];
             }
+
+            $push['content'] = $this->decode($push['content']);
 
             // remove description from hash to avoid recreating it everytime
             $_push = $push;
@@ -630,6 +634,8 @@ class QueueHandler
                 $push['content']['additional'][] = $attributes[$attribute_id] . ': ' . $attribute_text;
             }
 
+            $push['content'] = $this->decode($push['content']);
+
             $hash = $this->contentHash($push['content']);
             $this->activity_hash['generate_seo'][$push['ref']] = $hash;
 
@@ -680,6 +686,8 @@ class QueueHandler
             if (trim(strtolower(preg_replace("/[^A-Za-z0-9 ]/", '', $_description))) != trim(strtolower(preg_replace("/[^A-Za-z0-9 ]/", '', strip_tags($this->decode($category['name'])))))) {
                 $push['content']['description'] = $category['description'];
             }
+
+            $push['content'] = $this->decode($push['content']);
 
             $hash = $this->contentHash($push['content']);
             $this->activity_hash['generate_seo'][$push['ref']] = $hash;
@@ -965,6 +973,8 @@ class QueueHandler
                 continue;
             }
 
+            $push['content'] = $this->decode($push['content']);
+
             $hash = $this->contentHash($push['content']);
             $this->activity_hash['translate'][$push['ref']] = $hash;
 
@@ -1035,6 +1045,8 @@ class QueueHandler
         }
 
         foreach (array_values($groups) as $push) {
+            $push['content'] = $this->decode($push['content']);
+
             $hash = $this->contentHash($push['content']);
             $this->activity_hash['translate'][$push['ref']] = $hash;
 
@@ -1107,6 +1119,8 @@ class QueueHandler
         }
 
         foreach (array_values($groups) as $push) {
+            $push['content'] = $this->decode($push['content']);
+
             $hash = $this->contentHash($push['content']);
             $this->activity_hash['translate'][$push['ref']] = $hash;
 
@@ -1179,6 +1193,8 @@ class QueueHandler
             if (empty($push['content'])) {
                 continue;
             }
+
+            $push['content'] = $this->decode($push['content']);
 
             $hash = $this->contentHash($push['content']);
             $this->activity_hash['translate'][$push['ref']] = $hash;
