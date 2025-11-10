@@ -558,6 +558,11 @@ class ControllerExtensionModuleOvesio extends Controller
         $this->load->model('localisation/language');
 
         $system_languages = $this->model_localisation_language->getLanguages();
+
+        usort($system_languages, function ($a, $b) {
+            return strcmp($a['name'], $b['name']);
+        });
+
         $data['system_languages'] = array_column($system_languages, null, 'language_id');
 
         $client = $this->buildClient();
