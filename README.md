@@ -67,16 +67,6 @@ From the **AI Description Generator** tab:
   - One time only
   - On each update
 
-### Feed Support
-- Multiple types of feeds are available:
-  - Products
-  - Categories
-  - Attributes
-  - Attribute groups
-  - Product options
-- These feeds enable Ovesio to periodically check and update resources
-- Feed URLs are listed in the **Translate Settings** tab
-
 ### Cron Integration
 - Automate processing with a cron job:
   ```
@@ -131,7 +121,6 @@ From the **AI Description Generator** tab:
 - Select languages and source/target mappings
 - Choose translatable fields (Name, Description, Tags, Meta Title, Meta Description, Meta Keywords)
 - Enable translation of additional product attributes and options
-- Copy the auto-generated feeds for integration with Ovesio
 
 ---
 
