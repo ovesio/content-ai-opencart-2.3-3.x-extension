@@ -22,13 +22,13 @@ class ModelExtensionModuleOvesio extends Model
         if (stripos($default_language, $config_language) === 0) {
             $default_language_id = $this->config->get('config_language_id');
         } else {
-            $query = $this->db->query("SELECT language_id FROM " . DB_PREFIX . "language WHERE code LIKE '%" . $this->db->escape($default_language) . "' LIMIT 1");
+            $query = $this->db->query("SELECT language_id FROM " . DB_PREFIX . "language WHERE code LIKE '" . $this->db->escape($default_language) . "%' LIMIT 1");
+
+            if (!$query->row) {
+                throw new Exception("Could not detect local default language based on language code '$default_language'");
+            }
 
             $default_language_id = $query->row['language_id'];
-        }
-
-        if (!$default_language_id) {
-            throw new Exception("Could not detect local default language based on language code " . $default_language);
         }
 
         $this->default_language_id = $default_language_id;
