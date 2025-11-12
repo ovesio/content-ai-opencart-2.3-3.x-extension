@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<modification>
+	<name>Ovesio.com</name>
+    <code>ovesio</code>
+	<version>1.0.0</version>
+	<author>Ovesio.com</author>
+	<link>https://ovesio.com</link>
+
+	<file path="admin/controller/catalog/{product,category,attribute_group,attribute,option}.php">
+        <operation error="log">
+        <search><![CDATA[$data['pagination'] = ]]></search>
+        <add position="after"><![CDATA[
+        // Ovesio START
+        if(version_compare(VERSION, '3.0.0.0') >= 0) {
+            $ovesi_module_key = 'module_ovesio';
+            $token_qs = 'user_token=' . $this->session->data['user_token'];
+
+            $this->load->language('extension/module/ovesio', 'ovesio');
+            $language = $this->language->get('ovesio');
+        } else {
+            $ovesi_module_key = 'ovesio';
+            $token_qs = 'token=' . $this->session->data['token'];
+
+            $this->load->language('extension/module/ovesio', 'ovesio');
+            $language = $this->language;
+        }
+
+        $ovesio_status                  = $this->config->get($ovesi_module_key . '_status');
+        $ovesio_generate_content_status = $this->config->get($ovesi_module_key . '_generate_content_status');
+        $ovesio_generate_seo_status     = $this->config->get($ovesi_module_key . '_generate_seo_status');
+        $ovesio_translate_status        = $this->config->get($ovesi_module_key . '_translate_status');
+
+        $ovesio_route_resource = [
+            'catalog/product'         => 'products',
+            'catalog/category'        => 'categories',
+            'catalog/attribute_group' => 'attributes',
+            'catalog/attribute'       => 'attributes',
+            'catalog/option'          => 'options',
+        ];
+
+        $data['ovesio_generate_content_status'] = false;
+        $data['ovesio_generate_seo_status']     = false;
+        $data['ovesio_translate_status']        = false;
+
+        $data['text_generate_content'] = $language->get('text_generate_content_with_ovesio');
+        $data['text_generate_seo']     = $language->get('text_generate_seo_with_ovesio');
+        $data['text_translate']        = $language->get('text_translate_with_ovesio');
+
+        if (isset($ovesio_route_resource[$this->request->get['route']])) {
+            $resource = $ovesio_route_resource[$this->request->get['route']];
+
+            $data['ovesio_generate_content_status'] = $ovesio_status && $ovesio_generate_content_status && in_array($resource, ['products', 'categories']);
+            $data['ovesio_generate_seo_status']     = $ovesio_status && $ovesio_generate_seo_status && in_array($resource, ['products', 'categories']);
+            $data['ovesio_translate_status']        = $ovesio_status && $ovesio_translate_status;
+
+            $data['ovesio_manual_url'] = $this->url->link('extension/module/ovesio/manual', 'from=' . $this->request->get['route'] . '&' . $token_qs, true);
+            $data['ovesio_resource'] = $resource;
+            $data['ovesio_route'] = $this->request->get['route'];
+
+            $this->document->addStyle('view/stylesheet/ovesio.css');
+            $this->document->addScript('view/javascript/ovesio.js');
+        }
+        // Ovesio END
+        ]]></add>
+        </operation>
+    </file>
+
+	<file path="admin/view/template/catalog/{product_list,category_list,attribute_group_list,attribute_list,option_list}.twig">
+        <operation error="skip">
+        <search><![CDATA[<div class="pull-right">]]></search>
+        <add position="replace"><![CDATA[<div class="pull-right">
+        <!-- Ovesio START -->
+        {% if ovesio_generate_content_status %}
+        <button type="button" class="btn" data-resource="{{ ovesio_resource }}" data-route="{{ ovesio_route }}" data-href="{{ ovesio_manual_url }}" style="background: #0dcaf0; color: white; font-weight: bold;" onclick="ovesio.generateContent(event)">{{ text_generate_content }}</button>
+        {% endif %}
+        {% if ovesio_generate_seo_status %}
+        <button type="button" class="btn" data-resource="{{ ovesio_resource }}" data-route="{{ ovesio_route }}" data-href="{{ ovesio_manual_url }}" style="background: #ffc107; color: white; font-weight: bold;" onclick="ovesio.generateSeo(event)">{{ text_generate_seo }}</button>
+        {% endif %}
+        {% if ovesio_translate_status %}
+        <button type="button" class="btn" data-resource="{{ ovesio_resource }}" data-route="{{ ovesio_route }}" data-href="{{ ovesio_manual_url }}" style="background: #198754; color: white; font-weight: bold;" onclick="ovesio.translate(event)">{{ text_translate }}</button>
+        {% endif %}
+        <!-- Ovesio END -->
+        ]]></add>
+        </operation>
+    </file>
+
+	<file path="admin/view/template/catalog/{product_list,category_list,attribute_group_list,attribute_list,option_list}.tpl">
+        <operation error="skip">
+        <search><![CDATA[<div class="pull-right">]]></search>
+        <add position="replace"><![CDATA[<div class="pull-right">
+        <!-- Ovesio START -->
+        <?php if ($ovesio_generate_content_status): ?>
+        <button type="button" class="btn" data-resource="<?php echo $ovesio_resource; ?>" data-route="<?php echo $ovesio_route; ?>" data-href="<?php echo $ovesio_manual_url; ?>" style="background: #0dcaf0; color: white; font-weight: bold;" onclick="ovesio.generateContent(event)"><?php echo $text_generate_content; ?></button>
+        <?php endif; ?>
+        <?php if ($ovesio_generate_seo_status): ?>
+        <button type="button" class="btn" data-resource="<?php echo $ovesio_resource; ?>" data-route="<?php echo $ovesio_route; ?>" data-href="<?php echo $ovesio_manual_url; ?>" style="background: #ffc107; color: white; font-weight: bold;" onclick="ovesio.generateSeo(event)"><?php echo $text_generate_seo; ?></button>
+        <?php endif; ?>
+        <?php if ($ovesio_translate_status): ?>
+        <button type="button" class="btn" data-resource="<?php echo $ovesio_resource; ?>" data-route="<?php echo $ovesio_route; ?>" data-href="<?php echo $ovesio_manual_url; ?>" style="background: #198754; color: white; font-weight: bold;" onclick="ovesio.translate(event)"><?php echo $text_translate; ?></button>
+        <?php endif; ?>
+        <!-- Ovesio END -->
+        ]]></add>
+        </operation>
+    </file>
+</modification>
