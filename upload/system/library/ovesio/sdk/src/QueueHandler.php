@@ -344,6 +344,7 @@ class QueueHandler
         }
 
         if (!$request->getData()) {
+            $this->debug('total', '', 'generate_content', 0);
             return;
         }
 
@@ -382,8 +383,11 @@ class QueueHandler
                     'updated_at'    => date('Y-m-d H:i:s')
                 ]);
             }
+
+            $this->debug('total', '', 'generate_content', count($response['data']));
         } else {
             $this->massLogErrors($response, $request->getData(), 'generate_content');
+            $this->debug('total', '', 'generate_content', 0);
         }
     }
 
@@ -622,6 +626,7 @@ class QueueHandler
         }
 
         if (!$request->getData()) {
+            $this->debug('total', '', 'generate_seo', 0);
             return;
         }
 
@@ -660,7 +665,10 @@ class QueueHandler
                     'updated_at'    => date('Y-m-d H:i:s')
                 ]);
             }
+
+            $this->debug('total', '', 'generate_seo', count($response['data']));
         } else {
+            $this->debug('total', '', 'generate_seo', 0);
             $this->massLogErrors($response, $request->getData(), 'generate_seo');
         }
     }
@@ -918,6 +926,7 @@ class QueueHandler
         }
 
         if (!$request->getData()) {
+            $this->debug('total', '', 'translate', 0);
             return;
         }
 
@@ -953,7 +962,10 @@ class QueueHandler
                     ]);
                 }
             }
+
+            $this->debug('total', '', 'translate', count($response['data']));
         } else {
+            $this->debug('total', '', 'translate', 0);
             $this->massLogErrors($response, $request->getData(), 'translate');
         }
     }
