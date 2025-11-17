@@ -64,7 +64,7 @@ class ModelExtensionModuleOvesio extends Model
         $sql = $this->applyFilters($sql, $filters);
 
         $sql .= " GROUP BY ova.id";
-        $sql .= " ORDER BY ova.id DESC";
+        $sql .= " ORDER BY ova.updated_at DESC";
         $sql .= " LIMIT $offset, $limit";
 
         $query = $this->db->query($sql);
