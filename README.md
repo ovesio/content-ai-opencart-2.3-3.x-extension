@@ -83,7 +83,7 @@ From the **AI Description Generator** tab:
 ## Installation
 
 ### Step 1: Upload and Install the Module
-1. Download the module archive.
+1. Download the module archive called ovesio-translate.ocmod.zip.
 2. Navigate to **Extensions > Installer** in your OpenCart admin panel.
 3. Upload the module file and wait for installation to complete.
 4. Go to **Extensions > Modifications** and click the **Refresh** button.
