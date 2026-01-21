@@ -228,10 +228,13 @@ class QueueHandler
                         'resource_id'   => $resource_id,
                         'lang'          => $lang,
                         'activity_type' => $activity_type,
-                        'request'       => $request ? json_encode($request) : null,
                         'stale'         => 0,
                         'updated_at'    => date('Y-m-d H:i:s')
                     ];
+
+                    if($request) {
+                        $list_item['request'] = json_encode($request);
+                    }
 
                     if ($message) {
                         $list_item['message'] = $message;
@@ -255,10 +258,13 @@ class QueueHandler
                     'resource_id'   => $resource_id,
                     'lang'          => $default_language,
                     'activity_type' => $activity_type,
-                    'request'       => $request ? json_encode($request) : null,
                     'stale'         => 0,
                     'updated_at'    => date('Y-m-d H:i:s')
                 ];
+
+                if($request) {
+                    $list_item['request'] = json_encode($request);
+                }
 
                 if ($message) {
                     $list_item['message'] = $message;

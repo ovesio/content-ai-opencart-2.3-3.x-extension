@@ -6,7 +6,7 @@ use Ovesio\OvesioAI;
  * Name: Ovesio
  * Url: https://ovesio.com/
  * Author: Aweb Design SRL
- * Version: 2.4.0
+ * Version: 2.4.1
  */
 
 require_once(DIR_SYSTEM . '/library/ovesio/sdk/autoload.php');
@@ -204,7 +204,7 @@ class ControllerExtensionModuleOvesio extends Controller
     public function column_left_before($route, &$data)
     {
         if ($this->user->hasPermission('access', 'extension/module/ovesio')) {
-            $name = 'Ovesio AI';
+            $name = 'Ovesio - Content AI';
 
             $this->load->model('extension/module/ovesio');
 

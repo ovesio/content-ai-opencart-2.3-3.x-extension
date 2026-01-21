@@ -1,6 +1,6 @@
 <?php
 // Heading
-$_['heading_title']    = 'Ovesio [<a target="_blank" href="https://ovesio.com">ovesio.com</a>]';
+$_['heading_title']    = 'Ovesio - Content AI [<a target="_blank" href="https://ovesio.com">ovesio.com</a>]';
 
 // Text
 $_['text_system_language']        = 'System Language';
