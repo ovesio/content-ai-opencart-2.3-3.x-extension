@@ -20,11 +20,11 @@ jobs:
           cp -r admin catalog system build/upload/
           cp install.xml README.md build/
           cd build
-          zip -r ../ovesio-translate.ocmod.zip .
+          zip -r ../ovesio.ocmod.zip .
 
       - name: Upload asset
         uses: softprops/action-gh-release@v1
         with:
-          files: ovesio-translate.ocmod.zip
+          files: ovesio.ocmod.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
