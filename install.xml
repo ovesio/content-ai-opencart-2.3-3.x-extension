@@ -2,7 +2,7 @@
 <modification>
 	<name>Ovesio.com</name>
     <code>ovesio</code>
-	<version>1.0.1</version>
+	<version>1.0.2</version>
 	<author>Ovesio.com</author>
 	<link>https://ovesio.com</link>
 
@@ -71,13 +71,13 @@
         <add position="replace"><![CDATA[<div class="pull-right">
         <!-- Ovesio START -->
         {% if ovesio_generate_content_status %}
-        <button type="button" class="btn" data-resource="{{ ovesio_resource }}" data-route="{{ ovesio_route }}" data-href="{{ ovesio_manual_url }}" style="background: #0dcaf0; color: white; font-weight: bold; outline-color: unset;" onclick="ovesio.generateContent(event)">{{ text_generate_content }}</button>
+        <button type="button" class="btn" data-resource="{{ ovesio_resource }}" data-route="{{ ovesio_route }}" data-href="{{ ovesio_manual_url }}" style="background: #0dcaf0; color: white; font-weight: bold; outline-color: #0dcaf0; outline-offset: unset;" onclick="ovesio.generateContent(event)">{{ text_generate_content }}</button>
         {% endif %}
         {% if ovesio_generate_seo_status %}
-        <button type="button" class="btn" data-resource="{{ ovesio_resource }}" data-route="{{ ovesio_route }}" data-href="{{ ovesio_manual_url }}" style="background: #ffc107; color: white; font-weight: bold; outline-color: unset;" onclick="ovesio.generateSeo(event)">{{ text_generate_seo }}</button>
+        <button type="button" class="btn" data-resource="{{ ovesio_resource }}" data-route="{{ ovesio_route }}" data-href="{{ ovesio_manual_url }}" style="background: #ffc107; color: white; font-weight: bold; outline-color: #ffc107; outline-offset: unset;" onclick="ovesio.generateSeo(event)">{{ text_generate_seo }}</button>
         {% endif %}
         {% if ovesio_translate_status %}
-        <button type="button" class="btn" data-resource="{{ ovesio_resource }}" data-route="{{ ovesio_route }}" data-href="{{ ovesio_manual_url }}" style="background: #198754; color: white; font-weight: bold; outline-color: unset;" onclick="ovesio.translate(event)">{{ text_translate }}</button>
+        <button type="button" class="btn" data-resource="{{ ovesio_resource }}" data-route="{{ ovesio_route }}" data-href="{{ ovesio_manual_url }}" style="background: #198754; color: white; font-weight: bold; outline-color: #198754; outline-offset: unset;" onclick="ovesio.translate(event)">{{ text_translate }}</button>
         {% endif %}
         <!-- Ovesio END -->
         ]]></add>
@@ -90,13 +90,13 @@
         <add position="replace"><![CDATA[<div class="pull-right">
         <!-- Ovesio START -->
         <?php if ($ovesio_generate_content_status): ?>
-        <button type="button" class="btn" data-resource="<?php echo $ovesio_resource; ?>" data-route="<?php echo $ovesio_route; ?>" data-href="<?php echo $ovesio_manual_url; ?>" style="background: #0dcaf0; color: white; font-weight: bold; outline-color: unset;" onclick="ovesio.generateContent(event)"><?php echo $text_generate_content; ?></button>
+        <button type="button" class="btn" data-resource="<?php echo $ovesio_resource; ?>" data-route="<?php echo $ovesio_route; ?>" data-href="<?php echo $ovesio_manual_url; ?>" style="background: #0dcaf0; color: white; font-weight: bold; outline-color: #0dcaf0; outline-offset: unset;" onclick="ovesio.generateContent(event)"><?php echo $text_generate_content; ?></button>
         <?php endif; ?>
         <?php if ($ovesio_generate_seo_status): ?>
-        <button type="button" class="btn" data-resource="<?php echo $ovesio_resource; ?>" data-route="<?php echo $ovesio_route; ?>" data-href="<?php echo $ovesio_manual_url; ?>" style="background: #ffc107; color: white; font-weight: bold; outline-color: unset;" onclick="ovesio.generateSeo(event)"><?php echo $text_generate_seo; ?></button>
+        <button type="button" class="btn" data-resource="<?php echo $ovesio_resource; ?>" data-route="<?php echo $ovesio_route; ?>" data-href="<?php echo $ovesio_manual_url; ?>" style="background: #ffc107; color: white; font-weight: bold; outline-color: #ffc107; outline-offset: unset;" onclick="ovesio.generateSeo(event)"><?php echo $text_generate_seo; ?></button>
         <?php endif; ?>
         <?php if ($ovesio_translate_status): ?>
-        <button type="button" class="btn" data-resource="<?php echo $ovesio_resource; ?>" data-route="<?php echo $ovesio_route; ?>" data-href="<?php echo $ovesio_manual_url; ?>" style="background: #198754; color: white; font-weight: bold; outline-color: unset;" onclick="ovesio.translate(event)"><?php echo $text_translate; ?></button>
+        <button type="button" class="btn" data-resource="<?php echo $ovesio_resource; ?>" data-route="<?php echo $ovesio_route; ?>" data-href="<?php echo $ovesio_manual_url; ?>" style="background: #198754; color: white; font-weight: bold; outline-color: #198754; outline-offset: unset;" onclick="ovesio.translate(event)"><?php echo $text_translate; ?></button>
         <?php endif; ?>
         <!-- Ovesio END -->
         ]]></add>
