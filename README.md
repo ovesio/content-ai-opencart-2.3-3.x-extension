@@ -82,7 +82,16 @@ From the **AI Description Generator** tab:
 
 ## Installation
 
-### Step 1: Upload and Install the Module
+### Step 1: Prerequisites - Language Configuration
+**Note: This step is only necessary if you intend to translate your store into a new language.**
+
+Ovesio is capable of translating site content such as products, attributes, options, and categories. However, for the translation of static website text (e.g., standard buttons, menu items, system messages), you must install and configure a dedicated language pack from OpenCart.
+
+1. **Download a Language Pack**: Visit [opencart.com](https://www.opencart.com) and download the language pack for your desired target language.
+2. **Install and Configure**: Install the language pack and configure it in your OpenCart admin panel under **System > Localisation > Languages** (or **Settings > Localisation > Languages**).
+3. **Ready for Ovesio**: Once the language is installed and active in OpenCart, you can proceed to configure the Ovesio module to automatically translate your products into this language.
+
+### Step 2: Upload and Install the Module
 1. Download the module archive called ovesio.ocmod.zip.
 2. Navigate to **Extensions > Installer** in your OpenCart admin panel.
 3. Upload the module file and wait for installation to complete.
@@ -90,7 +99,7 @@ From the **AI Description Generator** tab:
 5. Navigate to **Extensions > Modules** and find `Ovesio - Content AI`.
 6. Click **Install** and then **Edit** to configure the module.
 
-### Step 2: Configure the Module
+### Step 3: Configure the Module
 
 #### General Tab
 - Enable the module
