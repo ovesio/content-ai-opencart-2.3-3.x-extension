@@ -1028,7 +1028,7 @@ class QueueHandler
                 continue;
             }
 
-            $this->debug('category', $category['category_id'], 'translate', 'translate');
+            $this->debug('category', $category['category_id'], 'translate', 'new');
 
             $this->discardNextEvents('translate', $push['ref']);
 
@@ -1117,7 +1117,7 @@ class QueueHandler
                 continue;
             }
 
-            $this->debug('product', $product['product_id'], 'translate', 'translate');
+            $this->debug('product', $product['product_id'], 'translate', 'new');
 
             $this->discardNextEvents('translate', $push['ref']);
 
@@ -1183,7 +1183,7 @@ class QueueHandler
                 continue;
             }
 
-            $this->debug('attribute_group', $push['ref'], 'translate', 'translate');
+            $this->debug('attribute_group', $push['ref'], 'translate', 'new');
 
             $this->discardNextEvents('translate', $push['ref']);
 
@@ -1258,7 +1258,7 @@ class QueueHandler
                 continue;
             }
 
-            $this->debug('attribute_group', $attribute['attribute_group_id'], 'translate', 'translate');
+            $this->debug('attribute_group', $attribute['attribute_group_id'], 'translate', 'new');
 
             $this->discardNextEvents('translate', $push['ref']);
 
@@ -1332,7 +1332,7 @@ class QueueHandler
                 continue;
             }
 
-            $this->debug('option', $option['option_id'], 'translate', 'translate');
+            $this->debug('option', $option['option_id'], 'translate', 'new');
 
             $this->discardNextEvents('translate', $push['ref']);
 
