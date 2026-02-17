@@ -96,10 +96,13 @@ class ControllerExtensionModuleOvesioCallback extends Controller
 
         $language_id  = $this->ovesio->getDefaultLanguageId();
         $language_settings = $this->config->get($this->module_key . '_language_settings');
-        foreach ($language_settings as $match_language_id => $lang) {
-            if (!empty($lang['code']) && $lang['code'] == $ovesio_language_code) {
-                $language_id = $match_language_id;
-                break;
+        if(!empty($language_settings))
+        {
+            foreach ($language_settings as $match_language_id => $lang) {
+                if (!empty($lang['code']) && $lang['code'] == $ovesio_language_code) {
+                    $language_id = $match_language_id;
+                    break;
+                }
             }
         }
 
