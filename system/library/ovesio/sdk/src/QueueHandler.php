@@ -279,6 +279,318 @@ class QueueHandler
         }
     }
 
+    /*********************************** PAYLOAD BUILDERS ***********************************/
+
+    /**
+     * Continutul trimis la Ovesio pentru fiecare produs, cu hash-ul lui. Folosit de coada si de
+     * migrarea care recalculeaza hash-urile, ca ambele sa dea acelasi hash pentru acelasi continut.
+     *
+     * @param string $activity_type generate_content | generate_seo | translate
+     * @param array $products randuri din model->getProducts()
+     * @return array product_id => ['ref', 'content', 'hash', 'description' => text fara taguri]
+     */
+    public function buildProductPayloads($activity_type, array $products)
+    {
+        if (empty($products)) {
+            return [];
+        }
+
+        $product_ids = array_column($products, 'product_id');
+
+        $translate_fields = [];
+        $with_attributes  = true;
+        $categories_ids   = [];
+
+        if ($activity_type == 'translate') {
+            $fields           = (array) $this->getOption('translate_fields', []);
+            $translate_fields = isset($fields['products']) ? (array) $fields['products'] : [];
+            $with_attributes  = !empty($fields['attributes']['value']);
+        } else {
+            $categories_ids = $this->model->getProductCategories($product_ids);
+        }
+
+        $product_attributes = [];
+        $attributes         = [];
+
+        if ($with_attributes) {
+            $product_attributes = $this->model->getProductsAttributes($product_ids);
+
+            $attribute_ids = [];
+            foreach ($product_attributes as $attributes_list) {
+                $attribute_ids = array_merge($attribute_ids, array_keys($attributes_list));
+            }
+
+            if ($attribute_ids) {
+                $attributes = array_column($this->model->getAttributes(array_unique($attribute_ids)), 'name', 'attribute_id');
+            }
+        }
+
+        $payloads = [];
+
+        foreach ($products as $product) {
+            $product_id = $product['product_id'];
+            $ref        = 'product/' . $product_id;
+
+            if ($activity_type == 'translate') {
+                $content = [];
+
+                foreach ($translate_fields as $key => $send) {
+                    if (!$send || empty($product[$key])) continue;
+
+                    $content[] = [
+                        'key'   => $key,
+                        'value' => $product[$key]
+                    ];
+                }
+
+                foreach (($product_attributes[$product_id] ?? []) as $attribute_id => $attribute_text) {
+                    $content[] = [
+                        'key'     => 'a-' . $attribute_id,
+                        'value'   => $attribute_text,
+                        'context' => isset($attributes[$attribute_id]) ? $attributes[$attribute_id] : ''
+                    ];
+                }
+
+                $content = $this->decode($content);
+
+                $payloads[$product_id] = [
+                    'ref'         => $ref,
+                    'content'     => $content,
+                    'hash'        => $content ? $this->contentHash($content) : '',
+                    'description' => '',
+                ];
+
+                continue;
+            }
+
+            $content = [
+                'name' => $product['name']
+            ];
+
+            // only if is different from name...usual mistake
+            $description = strip_tags($this->decode($product['description']));
+            if (trim(strtolower(preg_replace("/[^A-Za-z0-9 ]/", '', $description))) != trim(strtolower(preg_replace("/[^A-Za-z0-9 ]/", '', strip_tags($this->decode($product['name'])))))) {
+                $content['description'] = $product['description'];
+            }
+
+            foreach (($categories_ids[$product_id] ?? []) as $category_id) {
+                $category_info = $this->model->getCategory($category_id);
+
+                if ($category_info) {
+                    $content['categories'][] = ($category_info['path']) ? $category_info['path'] . ' &gt; ' . $category_info['name'] : $category_info['name'];
+                }
+            }
+
+            foreach (($product_attributes[$product_id] ?? []) as $attribute_id => $attribute_text) {
+                $content['additional'][] = (isset($attributes[$attribute_id]) ? $attributes[$attribute_id] : '') . ': ' . $attribute_text;
+            }
+
+            $content = $this->decode($content);
+
+            foreach ($content as $k => $v) {
+                if (is_array($v)) {
+                    sort($content[$k]);
+                }
+            }
+
+            // remove description from hash to avoid recreating it everytime
+            $hashable = $content;
+            if ($activity_type == 'generate_content') {
+                unset($hashable['description']);
+            }
+
+            $payloads[$product_id] = [
+                'ref'         => $ref,
+                'content'     => $content,
+                'hash'        => $this->contentHash($hashable),
+                'description' => $description,
+            ];
+        }
+
+        return $payloads;
+    }
+
+    /**
+     * Continutul trimis la Ovesio pentru fiecare categorie, cu hash-ul lui.
+     *
+     * @param string $activity_type generate_content | generate_seo | translate
+     * @param array $categories randuri din model->getCategories()
+     * @return array category_id => ['ref', 'content', 'hash', 'description' => text fara taguri]
+     */
+    public function buildCategoryPayloads($activity_type, array $categories)
+    {
+        $translate_fields = [];
+
+        if ($activity_type == 'translate') {
+            $fields           = (array) $this->getOption('translate_fields', []);
+            $translate_fields = isset($fields['categories']) ? (array) $fields['categories'] : [];
+        }
+
+        $payloads = [];
+
+        foreach ($categories as $category) {
+            $category_id = $category['category_id'];
+            $ref         = 'category/' . $category_id;
+
+            if ($activity_type == 'translate') {
+                $content = [];
+
+                foreach ($translate_fields as $key => $send) {
+                    if (!$send || empty($category[$key])) continue;
+
+                    $content[] = [
+                        'key'   => $key,
+                        'value' => $category[$key]
+                    ];
+                }
+
+                $content = $this->decode($content);
+
+                $payloads[$category_id] = [
+                    'ref'         => $ref,
+                    'content'     => $content,
+                    'hash'        => $content ? $this->contentHash($content) : '',
+                    'description' => '',
+                ];
+
+                continue;
+            }
+
+            $content = [
+                'name' => $category['name']
+            ];
+
+            // only if is different from name...usual mistake
+            $description = strip_tags($this->decode($category['description']));
+            if (trim(strtolower(preg_replace("/[^A-Za-z0-9 ]/", '', $description))) != trim(strtolower(preg_replace("/[^A-Za-z0-9 ]/", '', strip_tags($this->decode($category['name'])))))) {
+                $content['description'] = $category['description'];
+            }
+
+            $content = $this->decode($content);
+
+            // remove description from hash to avoid recreating it everytime
+            $hashable = $content;
+            if ($activity_type == 'generate_content') {
+                unset($hashable['description']);
+            }
+
+            $payloads[$category_id] = [
+                'ref'         => $ref,
+                'content'     => $content,
+                'hash'        => $this->contentHash($hashable),
+                'description' => $description,
+            ];
+        }
+
+        return $payloads;
+    }
+
+    /**
+     * Continutul de tradus pentru grupuri de atribute (numele grupului + numele atributelor).
+     *
+     * @return array attribute_group_id => ['ref', 'content', 'hash']
+     */
+    public function buildAttributeGroupPayloads(array $attribute_group_ids)
+    {
+        if (empty($attribute_group_ids)) {
+            return [];
+        }
+
+        $attribute_groups = array_column($this->model->getAttributeGroups($attribute_group_ids), null, 'attribute_group_id');
+
+        if (empty($attribute_groups)) {
+            return [];
+        }
+
+        $groups = [];
+        foreach ($attribute_group_ids as $attribute_group_id) {
+            if (!isset($attribute_groups[$attribute_group_id])) continue;
+
+            $groups[$attribute_group_id] = [
+                [
+                    'key'   => 'ag-' . $attribute_group_id,
+                    'value' => $attribute_groups[$attribute_group_id]['name']
+                ]
+            ];
+        }
+
+        foreach ($this->model->getGroupsAttributes($attribute_group_ids) as $attribute) {
+            if (!isset($groups[$attribute['attribute_group_id']])) continue;
+
+            $groups[$attribute['attribute_group_id']][] = [
+                'key'     => 'a-' . $attribute['attribute_id'],
+                'context' => $attribute_groups[$attribute['attribute_group_id']]['name'],
+                'value'   => $attribute['name'],
+            ];
+        }
+
+        $payloads = [];
+
+        foreach ($groups as $attribute_group_id => $content) {
+            $content = $this->decode($content);
+
+            $payloads[$attribute_group_id] = [
+                'ref'     => 'attribute_group/' . $attribute_group_id,
+                'content' => $content,
+                'hash'    => $this->contentHash($content),
+            ];
+        }
+
+        return $payloads;
+    }
+
+    /**
+     * Continutul de tradus pentru optiuni (numele optiunii + valorile ei).
+     *
+     * @return array option_id => ['ref', 'content', 'hash']
+     */
+    public function buildOptionPayloads(array $option_ids)
+    {
+        if (empty($option_ids)) {
+            return [];
+        }
+
+        $options = $this->model->getOptions($option_ids);
+
+        if (empty($options)) {
+            return [];
+        }
+
+        $option_values = [];
+        foreach ($this->model->getOptionValues($option_ids) as $option_value) {
+            $option_values[$option_value['option_id']][] = $option_value;
+        }
+
+        $payloads = [];
+
+        foreach ($options as $option) {
+            $content = [
+                [
+                    'key'   => 'o-' . $option['option_id'],
+                    'value' => $option['name'],
+                ]
+            ];
+
+            foreach (($option_values[$option['option_id']] ?? []) as $option_value) {
+                $content[] = [
+                    'key'     => 'ov-' . $option_value['option_value_id'],
+                    'context' => $option['name'],
+                    'value'   => $option_value['name'],
+                ];
+            }
+
+            $content = $this->decode($content);
+
+            $payloads[$option['option_id']] = [
+                'ref'     => 'option/' . $option['option_id'],
+                'content' => $content,
+                'hash'    => $this->contentHash($content),
+            ];
+        }
+
+        return $payloads;
+    }
+
     /*********************************** GENERATE CONTENT ***********************************/
 
     protected function handleGenerateContentQueue()
@@ -323,6 +635,15 @@ class QueueHandler
         $hash         = $this->getOption('hash');
         $server       = $this->getOption('server_url', '');
         $workflow     = $this->getOption('generate_content_workflow');
+
+        if (empty($workflow['id'])) {
+            if ($this->log) {
+                $this->log->write('Ovesio QueueHandler: no workflow selected for generate_content, nothing sent');
+            }
+            $this->debug('total', '', 'generate_content', 'no_workflow');
+            return;
+        }
+
         $callback_url = $server . 'index.php?route=extension/module/ovesio/callback&type=generate_content&hash=' . $hash;
         if ($this->getOption('manual')) {
             $callback_url .= '&manual=true';
@@ -409,88 +730,37 @@ class QueueHandler
             return;
         }
 
-        // chunk get attributes based on product_id
-        $product_attributes = $this->model->getProductsAttributes($product_ids);
+        $description_lengths_min = $this->getOption('generate_content_when_description_length');
 
-        $attribute_ids = [];
-        foreach ($product_attributes as $attributes) {
-            $attribute_ids = array_merge($attribute_ids, array_keys($attributes));
-        }
+        foreach ($this->buildProductPayloads('generate_content', $products) as $product_id => $payload) {
+            $content = $payload['content'];
 
-        $attributes = $this->model->getAttributes($attribute_ids);
-        $attributes = array_column($attributes, 'name', 'attribute_id');
+            $this->activity_hash['generate_content'][$payload['ref']] = $payload['hash'];
 
-        $categories_ids = $this->model->getProductCategories($product_ids);
-
-        foreach ($products as $i => $product) {
-            $push = [
-                'ref' => 'product/' . $product['product_id'],
-                'content' => [
-                    'name' => $product['name']
-                ]
-            ];
-
-            // only if is different from name...usual mistake
-            $_description = strip_tags($this->decode($product['description']));
-            if (strtolower(preg_replace("/[^A-Za-z0-9 ]/", '', $_description)) != strtolower(preg_replace("/[^A-Za-z0-9 ]/", '', strip_tags($this->decode($product['name']))))) {
-                $push['content']['description'] = $product['description'];
-            }
-
-            foreach (($categories_ids[$product['product_id']] ?? []) as $category_id) {
-                $category_info = $this->model->getCategory($category_id);
-
-                if ($category_info) {
-                    $push['content']['categories'][] = ($category_info['path']) ? $category_info['path'] . ' &gt; ' . $category_info['name'] : $category_info['name'];
-                }
-            }
-
-            foreach (($product_attributes[$product['product_id']] ?? []) as $attribute_id => $attribute_text) {
-                $push['content']['additional'][] = $attributes[$attribute_id] . ': ' . $attribute_text;
-            }
-
-            $push['content'] = $this->decode($push['content']);
-
-            foreach ($push['content'] as $k => $v) {
-                if (is_array($v)) {
-                    sort($push['content'][$k]);
-                }
-            }
-
-            // remove description from hash to avoid recreating it everytime
-            $hashable_push = $push;
-            unset($hashable_push['content']['description']);
-
-            $hash = $this->contentHash($hashable_push['content']);
-            $this->activity_hash['generate_content'][$push['ref']] = $hash;
-
-            if (!$this->activityIsStaled($activities, 'product', $product['product_id'], $hash, 'generate_content')) {
+            if (!$this->activityIsStaled($activities, 'product', $product_id, $payload['hash'], 'generate_content')) {
                 continue;
             }
 
-            $description_lengths_min = $this->getOption('generate_content_when_description_length');
-
-            $payload_length = $this->getAiRequestPayloadLength($push['content']);
-            if ($payload_length <= 25) { // fallback
-                if (isset($push['content']['description'])) {
-                    $push['content']['description'] = $push['content']['name'] . "\n" . $push['content']['description'];
+            // try to save resource from being ignored by minimum 25 chars limit
+            if ($this->getAiRequestPayloadLength($content) <= 25) { // fallback
+                if (isset($content['description'])) {
+                    $content['description'] = $content['name'] . "\n" . $content['description'];
                 } else {
-                    $push['content']['description'] = $push['content']['name'];
+                    $content['description'] = $content['name'];
                 }
-
-                $payload_length = $this->getAiRequestPayloadLength($push['content']);
             }
 
-            if (strlen($_description) > $description_lengths_min['products']) {
-                $this->debug('product', $product['product_id'], 'generate_content', 'max_length_not_met');
-                $this->ignoreMoveOnNextEvent('product', $product['product_id'], 'generate_content', "Description exceeds the " . $description_lengths_min['products'] . ' character limit' , 'skipped');
+            if (strlen($payload['description']) > $description_lengths_min['products']) {
+                $this->debug('product', $product_id, 'generate_content', 'max_length_not_met');
+                $this->ignoreMoveOnNextEvent('product', $product_id, 'generate_content', "Description exceeds the " . $description_lengths_min['products'] . ' character limit' , 'skipped');
                 continue;
             }
 
-            $this->debug('product', $product['product_id'], 'generate_content', 'new');
+            $this->debug('product', $product_id, 'generate_content', 'new');
 
-            $this->discardNextEvents('generate_description', $push['ref']);
+            $this->discardNextEvents('generate_content', $payload['ref']);
 
-            $request->data($push['content'], $push['ref']);
+            $request->data($content, $payload['ref']);
         }
     }
 
@@ -506,58 +776,37 @@ class QueueHandler
             return;
         }
 
-        foreach ($categories as $i => $category) {
-            $push = [
-                'ref' => 'category/' . $category['category_id'],
-                'content' => [
-                    'name' => $category['name']
-                ]
-            ];
+        $description_lengths_min = $this->getOption('generate_content_when_description_length');
 
-            // only if is different from name...usual mistake
-            $_description = strip_tags($this->decode($category['description']));
-            if (strtolower(preg_replace("/[^A-Za-z0-9 ]/", '', $_description)) != strtolower(preg_replace("/[^A-Za-z0-9 ]/", '', strip_tags($this->decode($category['name']))))) {
-                $push['content']['description'] = $category['description'];
-            }
+        foreach ($this->buildCategoryPayloads('generate_content', $categories) as $category_id => $payload) {
+            $content = $payload['content'];
 
-            $push['content'] = $this->decode($push['content']);
+            $this->activity_hash['generate_content'][$payload['ref']] = $payload['hash'];
 
-            // remove description from hash to avoid recreating it everytime
-            $hashable_push = $push;
-            unset($hashable_push['content']['description']);
-
-            $hash = $this->contentHash($hashable_push['content']);
-            $this->activity_hash['generate_content'][$push['ref']] = $hash;
-
-            if (!$this->activityIsStaled($activities, 'category', $category['category_id'], $hash, 'generate_content')) {
+            if (!$this->activityIsStaled($activities, 'category', $category_id, $payload['hash'], 'generate_content')) {
                 continue;
             }
-
-            $description_lengths_min = $this->getOption('generate_content_when_description_length');
 
             // try to save resource from being ignored by minimum 25 chars limit
-            $payload_length = $this->getAiRequestPayloadLength($push['content']);
-            if ($payload_length <= 25) { // fallback
-                if (isset($push['content']['description'])) {
-                    $push['content']['description'] = $push['content']['name'] . "\n" . $push['content']['description'];
+            if ($this->getAiRequestPayloadLength($content) <= 25) { // fallback
+                if (isset($content['description'])) {
+                    $content['description'] = $content['name'] . "\n" . $content['description'];
                 } else {
-                    $push['content']['description'] = $push['content']['name'];
+                    $content['description'] = $content['name'];
                 }
-
-                $payload_length = $this->getAiRequestPayloadLength($push['content']);
             }
 
-            if (strlen($_description) > $description_lengths_min['categories']) {
-                $this->debug('category', $category['category_id'], 'generate_content', 'max_length_not_met');
-                $this->ignoreMoveOnNextEvent('category', $category['category_id'], 'generate_content', "Description exceeds the " . $description_lengths_min['categories'] . ' character limit' , 'skipped');
+            if (strlen($payload['description']) > $description_lengths_min['categories']) {
+                $this->debug('category', $category_id, 'generate_content', 'max_length_not_met');
+                $this->ignoreMoveOnNextEvent('category', $category_id, 'generate_content', "Description exceeds the " . $description_lengths_min['categories'] . ' character limit' , 'skipped');
                 continue;
             }
 
-            $this->debug('category', $category['category_id'], 'generate_content', 'new');
+            $this->debug('category', $category_id, 'generate_content', 'new');
 
-            $this->discardNextEvents('generate_description', $push['ref']);
+            $this->discardNextEvents('generate_content', $payload['ref']);
 
-            $request->data($push['content'], $push['ref']);
+            $request->data($content, $payload['ref']);
         }
     }
 
@@ -605,6 +854,15 @@ class QueueHandler
         $hash         = $this->getOption('hash');
         $server       = $this->getOption('server_url', '');
         $workflow     = $this->getOption('generate_seo_workflow');
+
+        if (empty($workflow['id'])) {
+            if ($this->log) {
+                $this->log->write('Ovesio QueueHandler: no workflow selected for generate_seo, nothing sent');
+            }
+            $this->debug('total', '', 'generate_seo', 'no_workflow');
+            return;
+        }
+
         $callback_url = $server . 'index.php?route=extension/module/ovesio/callback&type=generate_seo&hash=' . $hash;
         if ($this->getOption('manual')) {
             $callback_url .= '&manual=true';
@@ -682,11 +940,10 @@ class QueueHandler
     protected function pushGenerateProductSeoRequests($request, $activities, $include_disabled = false, $include_stock_0 = true)
     {
         $product_ids = array_keys($activities);
-        $this->debug('product', $product_ids, 'generate_seo', 'not_found'); // we make presence known on each iteration
-        $only_for_action = $this->getOption('generate_seo_only_for_action');
+                $only_for_action = $this->getOption('generate_seo_only_for_action');
 
         if ($only_for_action) {
-            $this->debug('product', $product_ids, 'generate_seo', 'skipped'); // we make presence known on each iteration
+            $this->debug('product', $product_ids, 'generate_seo', 'skipped', 'needs_content_generation'); // we make presence known on each iteration
             $products = $this->model->getProductsWithDescriptionDependency($product_ids, $include_disabled, $include_stock_0);
         } else {
             $this->debug('product', $product_ids, 'generate_seo', 'not_found'); // we make presence known on each iteration
@@ -694,70 +951,28 @@ class QueueHandler
         }
 
         if (empty($products)) {
-            $this->ignoreMoveOnNextEvent('product', $product_ids, 'generate_seo', "Not found, disabled or out of stock", 'skipped');
+            $this->ignoreMoveOnNextEvent('product', $product_ids, 'generate_seo', $only_for_action ? "Description not generated yet, not found, disabled or out of stock" : "Not found, disabled or out of stock", 'skipped');
             return;
         }
 
-        // chunk get attributes based on product_id
-        $product_attributes = $this->model->getProductsAttributes($product_ids);
+        foreach ($this->buildProductPayloads('generate_seo', $products) as $product_id => $payload) {
+            $this->activity_hash['generate_seo'][$payload['ref']] = $payload['hash'];
 
-        $attribute_ids = [];
-        foreach ($product_attributes as $attributes) {
-            $attribute_ids = array_merge($attribute_ids, array_keys($attributes));
-        }
-
-        $attributes = $this->model->getAttributes($attribute_ids);
-        $attributes = array_column($attributes, 'name', 'attribute_id');
-
-        $categories_ids = $this->model->getProductCategories($product_ids);
-
-        foreach ($products as $i => $product) {
-            $push = [
-                'ref' => 'product/' . $product['product_id'],
-                'content' => [
-                    'name' => $product['name']
-                ]
-            ];
-
-            // only if is different from name...usual mistake
-            $_description = strip_tags($this->decode($product['description']));
-            if (trim(strtolower(preg_replace("/[^A-Za-z0-9 ]/", '', $_description))) != trim(strtolower(preg_replace("/[^A-Za-z0-9 ]/", '', strip_tags($this->decode($product['name'])))))) {
-                $push['content']['description'] = $product['description'];
-            }
-
-            foreach (($categories_ids[$product['product_id']] ?? []) as $category_id) {
-                $category_info = $this->model->getCategory($category_id);
-
-                if ($category_info) {
-                    $push['content']['categories'][] = ($category_info['path']) ? $category_info['path'] . ' &gt; ' . $category_info['name'] : $category_info['name'];
-                }
-            }
-
-            foreach (($product_attributes[$product['product_id']] ?? []) as $attribute_id => $attribute_text) {
-                $push['content']['additional'][] = $attributes[$attribute_id] . ': ' . $attribute_text;
-            }
-
-            $push['content'] = $this->decode($push['content']);
-
-            $hash = $this->contentHash($push['content']);
-            $this->activity_hash['generate_seo'][$push['ref']] = $hash;
-
-            if (!$this->activityIsStaled($activities, 'product', $product['product_id'], $hash, 'generate_seo')) {
+            if (!$this->activityIsStaled($activities, 'product', $product_id, $payload['hash'], 'generate_seo')) {
                 continue;
             }
 
-            $this->debug('product', $product['product_id'], 'generate_seo', 'new');
+            $this->debug('product', $product_id, 'generate_seo', 'new');
 
-            $this->discardNextEvents('generate_seo', $push['ref']);
+            $this->discardNextEvents('generate_seo', $payload['ref']);
 
-            $request->data($push['content'], $push['ref']);
+            $request->data($payload['content'], $payload['ref']);
         }
     }
 
     protected function pushGenerateCategorySeoRequests($request, $activities, $include_disabled = false)
     {
         $category_ids = array_keys($activities);
-        $this->debug('category', $category_ids, 'generate_seo', 'not_found'); // we make presence known on each iteration
         $only_for_action = $this->getOption('generate_seo_only_for_action');
 
         if ($only_for_action) {
@@ -769,46 +984,24 @@ class QueueHandler
         }
 
         if (empty($categories)) {
-            if ($only_for_action) {
-                // he would have, if it wasn't for that condition
-                $categories = $this->model->getCategories($category_ids, $include_disabled);
-                if (empty($categories)) {
-                    // still not found
-                    $this->ignoreMoveOnNextEvent('category', $category_ids, 'generate_seo', "Not found or disabled", 'skipped');
-                }
-            }
-
+            // Marcate skipped ca sa nu ramana la nesfarsit in lista cronului; la generarea descrierii,
+            // callback-ul reproceseaza resursa si hash-ul gol le trimite atunci.
+            $this->ignoreMoveOnNextEvent('category', $category_ids, 'generate_seo', $only_for_action ? "Description not generated yet, not found or disabled" : "Not found or disabled", 'skipped');
             return;
         }
 
-        foreach ($categories as $i => $category) {
-            $push = [
-                'ref' => 'category/' . $category['category_id'],
-                'content' => [
-                    'name' => $category['name']
-                ]
-            ];
+        foreach ($this->buildCategoryPayloads('generate_seo', $categories) as $category_id => $payload) {
+            $this->activity_hash['generate_seo'][$payload['ref']] = $payload['hash'];
 
-            // only if is different from name...usual mistake
-            $_description = strip_tags($this->decode($category['description']));
-            if (trim(strtolower(preg_replace("/[^A-Za-z0-9 ]/", '', $_description))) != trim(strtolower(preg_replace("/[^A-Za-z0-9 ]/", '', strip_tags($this->decode($category['name'])))))) {
-                $push['content']['description'] = $category['description'];
-            }
-
-            $push['content'] = $this->decode($push['content']);
-
-            $hash = $this->contentHash($push['content']);
-            $this->activity_hash['generate_seo'][$push['ref']] = $hash;
-
-            if (!$this->activityIsStaled($activities, 'category', $category['category_id'], $hash, 'generate_seo')) {
+            if (!$this->activityIsStaled($activities, 'category', $category_id, $payload['hash'], 'generate_seo')) {
                 continue;
             }
 
-            $this->debug('category', $category['category_id'], 'generate_seo', 'new');
+            $this->debug('category', $category_id, 'generate_seo', 'new');
 
-            $this->discardNextEvents('generate_seo', $push['ref']);
+            $this->discardNextEvents('generate_seo', $payload['ref']);
 
-            $request->data($push['content'], $push['ref']);
+            $request->data($payload['content'], $payload['ref']);
         }
     }
 
@@ -875,6 +1068,15 @@ class QueueHandler
         $hash         = $this->getOption('hash');
         $server       = $this->getOption('server_url', '');
         $workflow     = $this->getOption('translate_workflow');
+
+        if (empty($workflow['id'])) {
+            if ($this->log) {
+                $this->log->write('Ovesio QueueHandler: no workflow selected for translate, nothing sent');
+            }
+            $this->debug('total', '', 'translate', 'no_workflow');
+            return;
+        }
+
         $callback_url = $server . 'index.php?route=extension/module/ovesio/callback&type=translate&hash=' . $hash;
         if ($this->getOption('manual')) {
             $callback_url .= '&manual=true';
@@ -982,14 +1184,11 @@ class QueueHandler
         $this->debug('category', $category_ids, 'translate', 'not_found'); // we make presence known on each iteration
 
         $translate_for = $this->getTranslateFor();
-        $translate_fields = (array) $this->getOption('translate_fields', []);
 
         if (empty($translate_for['categories'])) {
             $this->debug('category', $category_ids, 'translate', 'skipped', 'disabled');
             return;
         }
-
-        $translate_fields = $translate_fields['categories'];
 
         $categories = $this->model->getCategories($category_ids, $include_disabled);
 
@@ -998,41 +1197,24 @@ class QueueHandler
             return;
         }
 
-        foreach ($categories as $i => $category) {
-            $push = [
-                'ref'     => 'category/' . $category['category_id'],
-                'content' => []
-            ];
-
-            foreach ($translate_fields as $key => $send) {
-                if (!$send || empty($category[$key])) continue;
-
-                $push['content'][] = [
-                    'key'   => $key,
-                    'value' => $category[$key]
-                ];
-            }
-
-            if (empty($push['content'])) {
-                $this->ignoreMoveOnNextEvent('category', $category['category_id'], 'translate', "Empty content to translate", 'skipped');
-                $this->debug('category', $category['category_id'], 'translate', 'skipped', 'empty_content');
+        foreach ($this->buildCategoryPayloads('translate', $categories) as $category_id => $payload) {
+            if (empty($payload['content'])) {
+                $this->ignoreMoveOnNextEvent('category', $category_id, 'translate', "Empty content to translate", 'skipped');
+                $this->debug('category', $category_id, 'translate', 'skipped', 'empty_content');
                 continue;
             }
 
-            $push['content'] = $this->decode($push['content']);
+            $this->activity_hash['translate'][$payload['ref']] = $payload['hash'];
 
-            $hash = $this->contentHash($push['content']);
-            $this->activity_hash['translate'][$push['ref']] = $hash;
-
-            if (!$this->activityIsStaled($activities, 'category', $category['category_id'], $hash, 'translate')) {
+            if (!$this->activityIsStaled($activities, 'category', $category_id, $payload['hash'], 'translate')) {
                 continue;
             }
 
-            $this->debug('category', $category['category_id'], 'translate', 'new');
+            $this->debug('category', $category_id, 'translate', 'new');
 
-            $this->discardNextEvents('translate', $push['ref']);
+            $this->discardNextEvents('translate', $payload['ref']);
 
-            $request->data($push['content'], $push['ref']);
+            $request->data($payload['content'], $payload['ref']);
         }
     }
 
@@ -1041,18 +1223,12 @@ class QueueHandler
         $product_ids = array_keys($activities);
         $this->debug('product', $product_ids, 'translate', 'not_found'); // we make presence known on each iteration
 
-        $translate_fields = (array) $this->getOption('translate_fields', []);
-        $translate_for = array_filter($translate_fields, function ($item) {
-            return array_filter($item);
-        });
+        $translate_for = $this->getTranslateFor();
 
         if (empty($translate_for['products'])) {
             $this->debug('product', $product_ids, 'translate', 'skipped', 'disabled');
             return;
         }
-
-        $attribute_translate_fields = $translate_fields['attributes'] ?? [];
-        $translate_fields           = $translate_fields['products'];
 
         $products = $this->model->getProducts($product_ids, $include_disabled, $include_stock_0);
 
@@ -1061,67 +1237,24 @@ class QueueHandler
             return;
         }
 
-        $product_attributes = [];
-        $attributes         = [];
-
-        if (!empty($translate_fields['attributes'])) {
-            // chunk get attributes based on product_id
-            $product_attributes = $this->model->getProductsAttributes($product_ids);
-
-            $attribute_ids = [];
-            foreach ($product_attributes as $attributes_list) {
-                $attribute_ids = array_merge($attribute_ids, array_keys($attributes_list));
-            }
-
-            $attributes = $this->model->getAttributes($attribute_ids);
-            $attributes = array_column($attributes, 'name', 'attribute_id');
-        }
-
-        foreach ($products as $i => $product) {
-            $push = [
-                'ref'     => 'product/' . $product['product_id'],
-                'content' => []
-            ];
-
-            foreach ($translate_fields as $key => $send) {
-                if (!$send || empty($product[$key])) continue;
-
-                $push['content'][] = [
-                    'key'   => $key,
-                    'value' => $product[$key]
-                ];
-            }
-
-            if (!empty($attribute_translate_fields['value'])) {
-                foreach (($product_attributes[$product['product_id']] ?? []) as $attribute_id => $attribute_text) {
-                    $push['content'][] = [
-                        'key'     => 'a-' . $attribute_id,
-                        'value'   => $attribute_text,
-                        'context' => $attributes[$attribute_id]
-                    ];
-                }
-            }
-
-            if (empty($push['content'])) {
-                $this->debug('product', $product['product_id'], 'translate', 'skipped', 'empty_content');
-                $this->ignoreMoveOnNextEvent('product', $product['product_id'], 'translate', "Empty content to translate", 'skipped');
+        foreach ($this->buildProductPayloads('translate', $products) as $product_id => $payload) {
+            if (empty($payload['content'])) {
+                $this->debug('product', $product_id, 'translate', 'skipped', 'empty_content');
+                $this->ignoreMoveOnNextEvent('product', $product_id, 'translate', "Empty content to translate", 'skipped');
                 continue;
             }
 
-            $push['content'] = $this->decode($push['content']);
+            $this->activity_hash['translate'][$payload['ref']] = $payload['hash'];
 
-            $hash = $this->contentHash($push['content']);
-            $this->activity_hash['translate'][$push['ref']] = $hash;
-
-            if (!$this->activityIsStaled($activities, 'product', $product['product_id'], $hash, 'translate')) {
+            if (!$this->activityIsStaled($activities, 'product', $product_id, $payload['hash'], 'translate')) {
                 continue;
             }
 
-            $this->debug('product', $product['product_id'], 'translate', 'new');
+            $this->debug('product', $product_id, 'translate', 'new');
 
-            $this->discardNextEvents('translate', $push['ref']);
+            $this->discardNextEvents('translate', $payload['ref']);
 
-            $request->data($push['content'], $push['ref']);
+            $request->data($payload['content'], $payload['ref']);
         }
     }
 
@@ -1138,60 +1271,25 @@ class QueueHandler
             return;
         }
 
-        $attribute_groups = $this->model->getAttributeGroups($attribute_group_ids);
-        $attribute_groups = array_column($attribute_groups, null, 'attribute_group_id');
+        $payloads = $this->buildAttributeGroupPayloads($attribute_group_ids);
 
-        if (empty($attribute_groups)) {
+        if (empty($payloads)) {
             $this->ignoreMoveOnNextEvent('attribute_group', $attribute_group_ids, 'translate', "No attribute groups found", 'skipped');
             return;
         }
 
-        $attributes = $this->model->getGroupsAttributes($attribute_group_ids);
+        foreach ($payloads as $attribute_group_id => $payload) {
+            $this->activity_hash['translate'][$payload['ref']] = $payload['hash'];
 
-        $groups = [];
-        foreach ($attribute_group_ids as $attribute_group_id) {
-            if (!isset($attribute_groups[$attribute_group_id])) continue;
-
-            $groups[$attribute_group_id] = [
-                'ref' => 'attribute_group/' . $attribute_group_id,
-                'content' => [
-                    [
-                        'key'   => 'ag-' . $attribute_group_id,
-                        'value' => $attribute_groups[$attribute_group_id]['name']
-                    ]
-                ]
-            ];
-        }
-
-        foreach ($attributes as $attribute) {
-            if (!isset($groups[$attribute['attribute_group_id']])) continue;
-
-            $groups[$attribute['attribute_group_id']]['content'][] = [
-                'key'     => 'a-' . $attribute['attribute_id'],
-                'context' => $attribute_groups[$attribute['attribute_group_id']]['name'],
-                'value'   => $attribute['name'],
-            ];
-        }
-
-        foreach (array_values($groups) as $push) {
-            $push['content'] = $this->decode($push['content']);
-
-            $hash = $this->contentHash($push['content']);
-            $this->activity_hash['translate'][$push['ref']] = $hash;
-
-            if (!$this->activityIsStaled($activities, 'attribute_group', $attribute['attribute_group_id'], $hash, 'translate')) {
+            if (!$this->activityIsStaled($activities, 'attribute_group', $attribute_group_id, $payload['hash'], 'translate')) {
                 continue;
             }
 
-            $this->debug('attribute_group', $push['ref'], 'translate', 'new');
+            $this->debug('attribute_group', $attribute_group_id, 'translate', 'new');
 
-            $this->discardNextEvents('translate', $push['ref']);
+            $this->discardNextEvents('translate', $payload['ref']);
 
-            $request->data($push['content'], $push['ref']);
-        }
-
-        if (!$request->getData()) {
-            $this->ignoreMoveOnNextEvent('attribute_group', $attribute_group_ids, 'translate', "No data left to process", 'skipped');
+            $request->data($payload['content'], $payload['ref']);
         }
     }
 
@@ -1202,77 +1300,44 @@ class QueueHandler
         $translate_for = $this->getTranslateFor();
 
         if (empty($translate_for['attributes'])) {
-            $attributes          = $this->model->getAttributes($attribute_ids);
-            $attribute_group_ids = array_column($attributes, 'attribute_group_id');
-            $this->debug('attribute_group', $attribute_group_ids, 'translate', 'skipped', 'disabled');
+            $this->debug('attribute', $attribute_ids, 'translate', 'skipped', 'disabled');
             $this->ignoreMoveOnNextEvent('attribute', $attribute_ids, 'translate', "Groups and Attributes translation is disabled", 'skipped');
             return;
         }
 
-        $attribute_groups = $this->model->getAttributeGroups();
-        if (empty($attribute_groups)) {
+        // Atributele se traduc pe grupul lor: trimitem grupurile din care fac parte
+        $attributes          = $this->model->getAttributes($attribute_ids);
+        $attribute_group_ids = array_values(array_unique(array_column($attributes, 'attribute_group_id')));
+
+        $this->debug('attribute_group', $attribute_group_ids, 'translate', 'not_found'); // we make presence known on each iteration
+
+        $payloads = $this->buildAttributeGroupPayloads($attribute_group_ids);
+
+        if (empty($payloads)) {
             $this->ignoreMoveOnNextEvent('attribute', $attribute_ids, 'translate', "No attribute groups found", 'skipped');
             return;
         }
 
-        $attribute_groups = array_column($attribute_groups, null, 'attribute_group_id');
+        foreach ($payloads as $attribute_group_id => $payload) {
+            $this->activity_hash['translate'][$payload['ref']] = $payload['hash'];
 
-        $attributes          = $this->model->getAttributes($attribute_ids);
-        $attribute_group_ids = array_column($attributes, 'attribute_group_id');
-        $attributes          = $this->model->getGroupsAttributes($attribute_group_ids);
-
-        $this->debug('attribute_group', $attribute_group_ids, 'translate', 'not_found'); // we make presence known on each iteration
-
-        $groups = [];
-        foreach ($attribute_group_ids as $attribute_group_id) {
-            if (!isset($attribute_groups[$attribute_group_id])) continue;
-
-            $groups[$attribute_group_id] = [
-                'ref' => 'attribute_group/' . $attribute_group_id,
-                'content' => [
-                    [
-                        'key'   => 'ag-' . $attribute_group_id,
-                        'value' => $attribute_groups[$attribute_group_id]['name']
-                    ]
-                ]
-            ];
-        }
-
-        foreach ($attributes as $attribute) {
-            if (!isset($groups[$attribute['attribute_group_id']])) continue;
-
-            $groups[$attribute['attribute_group_id']]['content'][] = [
-                'key'     => 'a-' . $attribute['attribute_id'],
-                'context' => $attribute_groups[$attribute['attribute_group_id']]['name'],
-                'value'   => $attribute['name'],
-            ];
-        }
-
-        foreach (array_values($groups) as $push) {
-            $push['content'] = $this->decode($push['content']);
-
-            $hash = $this->contentHash($push['content']);
-            $this->activity_hash['translate'][$push['ref']] = $hash;
-
-            if (!$this->activityIsStaled($activities, 'attribute_group', $attribute['attribute_group_id'], $hash, 'translate')) {
+            // activitatile primite sunt pe atribut, nu pe grup: grupul se trimite ca nou
+            if (!$this->activityIsStaled([], 'attribute_group', $attribute_group_id, $payload['hash'], 'translate')) {
                 continue;
             }
 
-            $this->debug('attribute_group', $attribute['attribute_group_id'], 'translate', 'new');
+            $this->debug('attribute_group', $attribute_group_id, 'translate', 'new');
 
-            $this->discardNextEvents('translate', $push['ref']);
+            $this->discardNextEvents('translate', $payload['ref']);
 
-            $request->data($push['content'], $push['ref']);
-        }
-
-        if (!$request->getData()) {
-            $this->ignoreMoveOnNextEvent('attribute', $attribute_ids, 'translate', "No data left to process", 'skipped');
+            $request->data($payload['content'], $payload['ref']);
         }
     }
 
     public function pushTranslateOptionRequests($request, $activities, $include_disabled = false)
     {
         $option_ids = array_keys($activities);
+        $this->debug('option', $option_ids, 'translate', 'not_found'); // we make presence known on each iteration
 
         $translate_for = $this->getTranslateFor();
 
@@ -1282,65 +1347,25 @@ class QueueHandler
             return;
         }
 
-        $options = $this->model->getOptions($option_ids);
-        if (empty($options)) {
+        $payloads = $this->buildOptionPayloads($option_ids);
+
+        if (empty($payloads)) {
             $this->ignoreMoveOnNextEvent('option', $option_ids, 'translate', "No options found", 'skipped');
             return;
         }
 
-        $option_values = $this->model->getOptionValues($option_ids);
+        foreach ($payloads as $option_id => $payload) {
+            $this->activity_hash['translate'][$payload['ref']] = $payload['hash'];
 
-        $_option_values = [];
-        foreach ($option_values as $option_value) {
-            $_option_values[$option_value['option_id']][] = $option_value;
-        }
-
-        $option_values = $_option_values;
-        unset($_option_values);
-
-        foreach ($options as $option) {
-            $push = [
-                'ref'     => 'option/' . $option['option_id'],
-                'content' => []
-            ];
-
-            $push['content'][] = [
-                'key'   => 'o-' . $option['option_id'],
-                'value' => $option['name'],
-            ];
-
-            foreach (($option_values[$option['option_id']] ?? []) as $option_value) {
-                $push['content'][] = [
-                    'key'     => 'ov-' . $option_value['option_value_id'],
-                    'context' => $option['name'],
-                    'value'   => $option_value['name'],
-                ];
-            }
-
-            if (empty($push['content'])) {
-                $this->ignoreMoveOnNextEvent('option', $option['option_id'], 'translate', "Empty content to translate", 'skipped');
-                $this->debug('option', $option['option_id'], 'translate', 'skipped', 'empty_content');
+            if (!$this->activityIsStaled($activities, 'option', $option_id, $payload['hash'], 'translate')) {
                 continue;
             }
 
-            $push['content'] = $this->decode($push['content']);
+            $this->debug('option', $option_id, 'translate', 'new');
 
-            $hash = $this->contentHash($push['content']);
-            $this->activity_hash['translate'][$push['ref']] = $hash;
+            $this->discardNextEvents('translate', $payload['ref']);
 
-            if (!$this->activityIsStaled($activities, 'option', $option['option_id'], $hash, 'translate')) {
-                continue;
-            }
-
-            $this->debug('option', $option['option_id'], 'translate', 'new');
-
-            $this->discardNextEvents('translate', $push['ref']);
-
-            $request->data($push['content'], $push['ref']);
-        }
-
-        if (!$request->getData()) {
-            $this->ignoreMoveOnNextEvent('option', $option_ids, 'translate', "No data left to process");
+            $request->data($payload['content'], $payload['ref']);
         }
     }
 
@@ -1478,7 +1503,7 @@ class QueueHandler
         }
     }
 
-    private function contentHash($data)
+    public function contentHash($data)
     {
         foreach ($data as $k => $v) {
             if (is_array($v)) {

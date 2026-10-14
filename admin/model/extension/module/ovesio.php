@@ -103,13 +103,9 @@ class ModelExtensionModuleOvesio extends Model
     private function applyFilters($sql, $filters)
     {
         if (!empty($filters['resource_name'])) {
-            $sql .= "
-                AND (      p.name LIKE '%Modules [AUTO - RO]%'
-   OR c.name LIKE '%Modules [AUTO - RO]%'
-   OR i.title LIKE '%Modules [AUTO - RO]%'
-   OR ag.name LIKE '%Modules [AUTO - RO]%'
-   OR o.name LIKE '%Modules [AUTO - RO]%')
-            ";
+            $name = $this->db->escape($filters['resource_name']);
+
+            $sql .= " AND (p.name LIKE '%" . $name . "%' OR c.name LIKE '%" . $name . "%' OR i.title LIKE '%" . $name . "%' OR ag.name LIKE '%" . $name . "%' OR o.name LIKE '%" . $name . "%')";
         }
 
         if (!empty($filters['resource_type'])) {
